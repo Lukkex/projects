@@ -33,7 +33,7 @@ if (len(sys.argv) != 3):
 
 # Takes in the server name and port and creates the client socket
 serverName = sys.argv[1]
-serverPort = sys.argv[2]
+serverPort = int(sys.argv[2])
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.settimeout(5)
 try:

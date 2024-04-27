@@ -40,9 +40,9 @@ def handleClientConnection(clientSocket):
     data = clientSocket.recv(1024).decode('utf-8')
 
     if data:
-        print('Received from ' + str(clientAddress) + ': ' + message.decode())
+        print('Received from ' + str(clientAddress) + ': ' + data.decode())
         serverSocket.sendto('PONG!'.encode(), clientAddress)
-        
+       
 # If the amount of arguments is anything other than 2, 
 # it will say in the console an invalid number of args and  kill the process.
 if (len(sys.argv) != 2):
@@ -65,5 +65,6 @@ while True:
     print(f'Connection from {clientAddress}')
     t = threading.Thread(target=handleClientConnection, args=(clientSocket,))
     t.start()
-    t.join()
+    #t.join()
+serverSocket.close()
     
