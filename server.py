@@ -38,16 +38,15 @@ import errno
 import threading
 
 # Fixed size of 10; if all slots are filled, do not allow new clients to register
-userRegistry = [None] * 10
+userRegistry = []
 
 # Will return true if member successfully added to registry
 # Will return false if member cannot join (list is full)
 def join(clientAddress, username):
     try:
-        for i in range(10):
-            if (userRegistry[i] == None):
-                userRegistry[i] = (clientAddress, username)
-                return True
+        if (len(userRegistry) <= 10):
+            userRegistry.append((clientAddress, username))
+            return True
         return False
     except Exception as e:
         print("Error: " + str(e))
@@ -56,13 +55,16 @@ def join(clientAddress, username):
 # Will return false if member is not in the registry
 def checkIfMember(clientAddress):
     try:
-        regAddresses, regUsernames = zip(*userRegistry)
+        if (len(userRegistry) > 0):
+            #Separates tuple into list of all addresses and usernames
+            regAddresses, regUsernames = zip(*userRegistry)
 
-        for i in range(10):
-            if (regAddresses[i] != None):
-                if (regAddresses[i] == clientAddress):
+            for i in regAddresses:
+                if (i == clientAddress):
                     return True
-        return False
+            return False
+        else:
+            return False
     except Exception as e:
         print("Error: " + str(e)) 
     
