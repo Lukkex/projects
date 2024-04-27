@@ -37,7 +37,36 @@ import sys
 import errno
 import threading
 
-def handleClientConnection(clientSocket, clientAddress, serverSocket):
+# Fixed size of 10; if all slots are filled, do not allow new clients to register
+userRegistry = [None] * 10
+
+# Will return true if member successfully added to registry
+# Will return false if member cannot join (list is full)
+def join(clientAddress, username):
+    try:
+        for i in range(10):
+            if (userRegistry[i] == None):
+                userRegistry[i] = (clientAddress, username)
+                return True
+        return False
+    except Exception as e:
+        print("Error: " + str(e))
+
+# Will return true if member is within the registry
+# Will return false if member is not in the registry
+def checkIfMember(clientAddress):
+    try:
+        regAddresses, regUsernames = zip(*userRegistry)
+
+        for i in range(10):
+            if (regAddresses[i] != None):
+                if (regAddresses[i] == clientAddress):
+                    return True
+        return False
+    except Exception as e:
+        print("Error: " + str(e)) 
+    
+def handleClientConnection(clientSocket, clientAddress):
     while True:
         try:
             data = clientSocket.recv(1024).decode('utf-8')
@@ -45,12 +74,31 @@ def handleClientConnection(clientSocket, clientAddress, serverSocket):
             if data:
                 print('Received from ' + str(clientAddress) + ': ' + data)
 
-                if (data == 'JOIN'):
-                    clientSocket.send('PONG!'.encode())
+                # Splits data/command by spaces
+                data_tokens = data.split()
+
+                if (data_tokens[0] == 'JOIN'):
+                    if (len(data_tokens) == 2):
+                        # Makes sure client isn't already a member
+                        if (checkIfMember(clientAddress)):
+                            clientSocket.send('You\'re already a member!'.encode())
+                        # Assumes username is alphanumeric
+                        # Checks if there is room for user to join
+                        elif (join(clientAddress, data_tokens[1])):
+                            clientSocket.send('Successfully joined! Enjoy!'.encode())
+                        else:
+                            clientSocket.send('Too many users in registry, try again later!'.encode())
+                        
+                    else:
+                        clientSocket.send('Invalid number of arguments for JOIN.\n\nTry: \'JOIN <username>\''.encode())
                 clientSocket.send('PONG!'.encode())
+        
         except IOError as e:
             if e.errno == errno.EPIPE:
-                pass
+                print("Pipe Error: " + str(e))
+
+        except Exception as e:
+            print("Error: " + str(e))
        
 # If the amount of arguments is anything other than 2, 
 # it will say in the console an invalid number of args and  kill the process.
@@ -68,12 +116,14 @@ serverSocket.listen(5)
 # Once the socket is setup, the server prints that it is ready to receive messages
 print(f'The server is ready! \nListening on {host}:{serverPort}')
 
-# Loop that continues until terminated manually, continuously listens for any incoming messages from clients. 
+# Loop that continues until terminated manually, continuously listens for any incoming connection requests from clients. 
 while True:
-    clientSocket, clientAddress = serverSocket.accept()
-    print(f'Connection from {clientAddress}')
-    t = threading.Thread(target=handleClientConnection, args=(clientSocket, clientAddress, serverSocket,))
-    t.start()
-    #t.join()
+    try:
+        clientSocket, clientAddress = serverSocket.accept()
+        print(f'Connection from {clientAddress}')
+        t = threading.Thread(target=handleClientConnection, args=(clientSocket, clientAddress,))
+        t.start()
+    except Exception as e:
+        print("Error: " + str(e))
 serverSocket.close()
     
