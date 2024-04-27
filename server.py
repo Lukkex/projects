@@ -40,6 +40,9 @@ import threading
 # Fixed size of 10; if all slots are filled, do not allow new clients to register
 userRegistry = []
 
+def setRegistry(newReg):
+    userRegistry = newReg
+
 # Will return true if member successfully added to registry
 # Will return false if member cannot join (list is full)
 def join(clientSocket, clientAddress, username):
@@ -56,7 +59,7 @@ def join(clientSocket, clientAddress, username):
 def checkIfMember(clientAddress):
     try:
         if (len(userRegistry) > 0):
-            #Separates tuple into list of all addresses and usernames
+            # Separates tuple into list of all addresses and usernames
             regSockets, userTuples = zip(*userRegistry)
             regAddresses, regUsernames = zip(*userTuples)
 
@@ -77,7 +80,7 @@ def regToString(list):
 def serverMessage(clientSocket, message):
     try:
         if (len(userRegistry) > 0):
-            #Separates tuple into list of all addresses and usernames
+            # Separates tuple into list of all addresses and usernames
             regSockets, userTuples = zip(*userRegistry)
             for socket in regSockets:
                 if (socket != clientSocket):
@@ -90,10 +93,42 @@ def serverMessage(clientSocket, message):
     except Exception as e:
         print("Error: " + str(e))
 
+def getUserTuple(clientSocket):
+    try:
+        if (len(userRegistry) > 0):
+            # Separates tuple into list of all addresses and usernames
+            regSockets, userTuples = zip(*userRegistry)
+            i = 0
+            for socket in regSockets:
+                if (socket == clientSocket):
+                    return userRegistry[i]
+                i += 1
+
+    except Exception as e:
+        print("Error: " + str(e))
+    
+    return None
+
+# Removes user from registry
+def removeUser(clientSocket):
+    try:
+        if (len(userRegistry) > 0):
+            # Separates tuple into list of all addresses and usernames
+            clientTuple = getUserTuple(clientSocket)
+            userRegistry.remove(clientTuple)
+            # setRegistry(newReg)
+            print('Removed user from list!')
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        print("Error: " + str(e))
     
 def handleClientConnection(clientSocket, clientAddress):
     while True:
         try:
+            clientSocket.settimeout(300)
             data = clientSocket.recv(1024).decode('utf-8')
 
             if data:
@@ -102,6 +137,7 @@ def handleClientConnection(clientSocket, clientAddress):
                 # Splits data/command by spaces
                 data_tokens = data.split()
 
+                # JOIN COMMAND
                 if (data_tokens[0] == 'JOIN'):
                     if (len(data_tokens) == 2):
                         # Makes sure client isn't already a member
@@ -118,6 +154,8 @@ def handleClientConnection(clientSocket, clientAddress):
                         
                     else:
                         clientSocket.send('Invalid number of arguments for JOIN.\n\nTry: \'JOIN <username>\''.encode())
+                
+                # LIST COMMAND
                 elif (data_tokens[0] == 'LIST'):
                     if (checkIfMember(clientAddress)):
                         userList = str(regToString(userRegistry))
@@ -125,14 +163,43 @@ def handleClientConnection(clientSocket, clientAddress):
                         print('Sent list!')
                     else:
                         clientSocket.send('You\'re not registered yet!'.encode())
-                clientSocket.send('PONG!'.encode())
+                
+                # BCST COMMAND
+                elif(data_tokens[0] == 'BCST'):
+                    data_tokens.remove(0)
+                    broadcastmsg = ' '.join(data_tokens)
+                    serverMessage(clientSocket, str(broadcastmsg))
+                
+                # QUIT COMMAND
+                elif (data_tokens[0] == 'QUIT'):
+                    clientSocket.send('QUIT'.encode())
+                    clientSocket.close()
+                    return
+                
+                # Otherwise
+                else:
+                    clientSocket.send('\nInvalid command.\n\nPlease use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nQUIT\n\n'.encode())
+                #clientSocket.send('PONG!'.encode())
         
+        except timeout:
+            print("Connection with " + str(clientAddress) + " timed out.")
+            break
+
+        except Exception as e:
+            pass
+
+        '''
         except IOError as e:
             if e.errno == errno.EPIPE:
                 print("Pipe Error: " + str(e))
-
-        except Exception as e:
-            print("Error: " + str(e))
+        '''
+    
+    try:
+        clientSocket.send('Connection timed out, please rejoin. \n(You took too long to send another message!)'.encode())
+        clientSocket.close()
+    except Exception as e:
+        pass
+    removeUser(clientSocket)
        
 # If the amount of arguments is anything other than 2, 
 # it will say in the console an invalid number of args and  kill the process.

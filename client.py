@@ -27,14 +27,30 @@ import sys
 import time
 import threading
 
+message = ''
+
 def listenForServer(clientSocket):
     while True:
         try:
             serverMessage = clientSocket.recv(1024).decode('utf-8')
             if (serverMessage is not None):
-                print(f'{serverMessage}')
+                print(f'\b\b{serverMessage}', end='\n> ')
+                if (serverMessage == 'Connection timed out, please rejoin. \n(You took too long to send another message!)'):
+                    print('\n\n\nEnter any key to quit the program.')
+                    break
+            if (serverMessage == 'QUIT'):
+                print('\n\n\nEnter any key to quit the program.')
+                break
+
         except Exception as e:
             pass
+
+    try:
+        clientSocket.close()
+    except Exception as e:
+        pass
+
+    return
 
 # If the number of arguments are not 3, terminate the process
 if (len(sys.argv) != 3):
@@ -57,15 +73,11 @@ t = threading.Thread(target=listenForServer, args=(clientSocket,))
 t.start()
 
 while True:
-    message = input('> ')
-    clientSocket.send(message.encode('utf-8'))
-    clientSocket.settimeout(1)
     try:
-        serverMessage = clientSocket.recv(1024).decode('utf-8')
-        print(f'{serverMessage}')
+        message = input('> ')
+        clientSocket.send(message.encode('utf-8'))
+        clientSocket.settimeout(300)
     except Exception as e:
-        print("Request timed out for " + message)
-
-    if (message == 'QUIT'):
-        clientSocket.close()
-        quit()
+        break
+quit()
+    
