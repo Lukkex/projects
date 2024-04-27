@@ -34,14 +34,23 @@ Client.py (hostname) (port number):
 from socket import *
 import random
 import sys
+import errno
 import threading
 
-def handleClientConnection(clientSocket):
-    data = clientSocket.recv(1024).decode('utf-8')
+def handleClientConnection(clientSocket, clientAddress, serverSocket):
+    while True:
+        try:
+            data = clientSocket.recv(1024).decode('utf-8')
 
-    if data:
-        print('Received from ' + str(clientAddress) + ': ' + data.decode())
-        serverSocket.sendto('PONG!'.encode(), clientAddress)
+            if data:
+                print('Received from ' + str(clientAddress) + ': ' + data)
+
+                if (data == 'JOIN'):
+                    clientSocket.send('PONG!'.encode())
+                clientSocket.send('PONG!'.encode())
+        except IOError as e:
+            if e.errno == errno.EPIPE:
+                pass
        
 # If the amount of arguments is anything other than 2, 
 # it will say in the console an invalid number of args and  kill the process.
@@ -63,7 +72,7 @@ print(f'The server is ready! \nListening on {host}:{serverPort}')
 while True:
     clientSocket, clientAddress = serverSocket.accept()
     print(f'Connection from {clientAddress}')
-    t = threading.Thread(target=handleClientConnection, args=(clientSocket,))
+    t = threading.Thread(target=handleClientConnection, args=(clientSocket, clientAddress, serverSocket,))
     t.start()
     #t.join()
 serverSocket.close()
