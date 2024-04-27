@@ -42,10 +42,10 @@ userRegistry = []
 
 # Will return true if member successfully added to registry
 # Will return false if member cannot join (list is full)
-def join(clientAddress, username):
+def join(clientSocket, clientAddress, username):
     try:
         if (len(userRegistry) <= 10):
-            userRegistry.append((clientAddress, username))
+            userRegistry.append((clientSocket, (clientAddress, username)))
             return True
         return False
     except Exception as e:
@@ -57,7 +57,8 @@ def checkIfMember(clientAddress):
     try:
         if (len(userRegistry) > 0):
             #Separates tuple into list of all addresses and usernames
-            regAddresses, regUsernames = zip(*userRegistry)
+            regSockets, userTuples = zip(*userRegistry)
+            regAddresses, regUsernames = zip(*userTuples)
 
             for i in regAddresses:
                 if (i == clientAddress):
@@ -67,6 +68,28 @@ def checkIfMember(clientAddress):
             return False
     except Exception as e:
         print("Error: " + str(e)) 
+
+def regToString(list):
+    regSockets, userTuples = zip(*list)
+    return ',\n'.join(map(str, userTuples))
+
+# Server broadcasting update message to each registered member
+def serverMessage(clientSocket, message):
+    try:
+        if (len(userRegistry) > 0):
+            #Separates tuple into list of all addresses and usernames
+            regSockets, userTuples = zip(*userRegistry)
+            for socket in regSockets:
+                if (socket != clientSocket):
+                    socket.send(message.encode())
+            return True
+        else:
+            return False
+
+
+    except Exception as e:
+        print("Error: " + str(e))
+
     
 def handleClientConnection(clientSocket, clientAddress):
     while True:
@@ -86,13 +109,22 @@ def handleClientConnection(clientSocket, clientAddress):
                             clientSocket.send('You\'re already a member!'.encode())
                         # Assumes username is alphanumeric
                         # Checks if there is room for user to join
-                        elif (join(clientAddress, data_tokens[1])):
+                        elif (join(clientSocket, clientAddress, data_tokens[1])):
                             clientSocket.send('Successfully joined! Enjoy!'.encode())
+                            print(str(data_tokens[1] + " joined!"))
+                            serverMessage(clientSocket, str(data_tokens[1]) + ' joined!')
                         else:
                             clientSocket.send('Too many users in registry, try again later!'.encode())
                         
                     else:
                         clientSocket.send('Invalid number of arguments for JOIN.\n\nTry: \'JOIN <username>\''.encode())
+                elif (data_tokens[0] == 'LIST'):
+                    if (checkIfMember(clientAddress)):
+                        userList = str(regToString(userRegistry))
+                        clientSocket.send(userList.encode())
+                        print('Sent list!')
+                    else:
+                        clientSocket.send('You\'re not registered yet!'.encode())
                 clientSocket.send('PONG!'.encode())
         
         except IOError as e:

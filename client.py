@@ -25,6 +25,16 @@ Client.py (hostname) (port number):
 from socket import *
 import sys
 import time
+import threading
+
+def listenForServer(clientSocket):
+    while True:
+        try:
+            serverMessage = clientSocket.recv(1024).decode('utf-8')
+            if (serverMessage is not None):
+                print(f'{serverMessage}')
+        except Exception as e:
+            pass
 
 # If the number of arguments are not 3, terminate the process
 if (len(sys.argv) != 3):
@@ -43,10 +53,12 @@ except Exception as e:
     print(f"Could not establish a connection with the host.\n\nError: {e}")
     quit()
 
+t = threading.Thread(target=listenForServer, args=(clientSocket,))
+t.start()
+
 while True:
     message = input('> ')
     clientSocket.send(message.encode('utf-8'))
-
     clientSocket.settimeout(1)
     try:
         serverMessage = clientSocket.recv(1024).decode('utf-8')
