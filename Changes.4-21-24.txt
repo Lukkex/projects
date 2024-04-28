@@ -1,0 +1,3 @@
+Added 'usage:' prompt on intitialization in both client.py and server.py
+
+Added array for connected sockets and a key array for clients, regarding their associated socket

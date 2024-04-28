@@ -1,5 +1,5 @@
 '''
-Server.py (port number):
+server.py (port number):
     Start on specified port, TCP socket
     When connects to client, create new thread to handle (POSIX)
     If >10 users registered, send to client “Too many users!” and close connection
@@ -76,15 +76,26 @@ def regToString(list):
     regSockets, userTuples = zip(*list)
     return ',\n'.join(map(str, userTuples))
 
-# Server broadcasting update message to each registered member
-def serverMessage(clientSocket, message):
+# Handles how to dispatch types of messages
+def serverMessageHandler(targSocket, message, type):
     try:
         if (len(userRegistry) > 0):
             # Separates tuple into list of all addresses and usernames
             regSockets, userTuples = zip(*userRegistry)
-            for socket in regSockets:
-                if (socket != clientSocket):
+            # for broadcasts - sender
+            if(type == 0):
+                for socket in regSockets:
+                    if (socket != targSocket):
+                        socket.send(message.encode())
+            # for broadcasts (everyone)
+            if(type == 1):
+                for socket in regSockets:
                     socket.send(message.encode())
+            # for direct messages
+            if(type == 2):
+                for socket in regSockets:
+                    if (socket == targSocket):
+                        socket.send(message.encode())
             return True
         else:
             return False
@@ -93,12 +104,16 @@ def serverMessage(clientSocket, message):
     except Exception as e:
         print("Error: " + str(e))
 
+# returns tuple of user (not functional, wont run first line when called)
+'''
 def getUserTuple(clientSocket):
     try:
         if (len(userRegistry) > 0):
+            print('tuple 0')
             # Separates tuple into list of all addresses and usernames
             regSockets, userTuples = zip(*userRegistry)
             i = 0
+            print('tuple 1')
             for socket in regSockets:
                 if (socket == clientSocket):
                     return userRegistry[i]
@@ -108,13 +123,45 @@ def getUserTuple(clientSocket):
         print("Error: " + str(e))
     
     return None
+'''
+
+# returns name of user (not functional, wont run first line when called)
+'''
+def getUsername(clientSocket):
+    print('wtf')
+    try:
+        if (len(userRegistry) > 0):
+            i = 0
+            for users in userRegistry:
+                if (userRegistry[i][0] == clientSocket):
+                    return userRegistry[i][1][1]
+                i += 1
+
+    except Exception as e:
+        print("Error: " + str(e))
+    
+    return None
+'''
 
 # Removes user from registry
 def removeUser(clientSocket):
     try:
         if (len(userRegistry) > 0):
             # Separates tuple into list of all addresses and usernames
-            clientTuple = getUserTuple(clientSocket)
+            
+            try:
+                if (len(userRegistry) > 0):
+                    # Separates tuple into list of all addresses and usernames
+                    regSockets, userTuples = zip(*userRegistry)
+                    i = 0
+                    for socket in regSockets:
+                        if (socket == clientSocket):
+                            clientTuple = userRegistry[i]
+                        i += 1
+
+            except Exception as e:
+                print("Error: " + str(e))
+            
             userRegistry.remove(clientTuple)
             # setRegistry(newReg)
             print('Removed user from list!')
@@ -148,7 +195,7 @@ def handleClientConnection(clientSocket, clientAddress):
                         elif (join(clientSocket, clientAddress, data_tokens[1])):
                             clientSocket.send('Successfully joined! Enjoy!'.encode())
                             print(str(data_tokens[1] + " joined!"))
-                            serverMessage(clientSocket, str(data_tokens[1]) + ' joined!')
+                            serverMessageHandler(clientSocket, str(data_tokens[1]) + ' joined!', 0)
                         else:
                             clientSocket.send('Too many users in registry, try again later!'.encode())
                         
@@ -166,14 +213,51 @@ def handleClientConnection(clientSocket, clientAddress):
                 
                 # BCST COMMAND
                 elif(data_tokens[0] == 'BCST'):
-                    data_tokens.remove(0)
+                    # removes fluff at beginning of message
+                    data_tokens.remove(data_tokens[0])
                     broadcastmsg = ' '.join(data_tokens)
-                    serverMessage(clientSocket, str(broadcastmsg))
+                    # gets username of current socket
+                    try:
+                        if (len(userRegistry) > 0):
+                            i = 0
+                            for users in userRegistry:
+                                if (userRegistry[i][0] == clientSocket):
+                                    userName = userRegistry[i][1][1]
+                                i += 1
+                    except Exception as e:
+                        print("Error: " + str(e))
+
+                    clientSocket.send((str(userName) + ' is sending a broadcast\n').encode())
+                    serverMessageHandler(clientSocket, str(userName) + ': ' + str(broadcastmsg), 1)
                 
+                # MESG COMMAND
+                elif(data_tokens[0] == 'MESG'):
+                    # removes fluff at beginning of message while storing target
+                    target = data_tokens[1]
+                    data_tokens.remove(data_tokens[1])
+                    data_tokens.remove(data_tokens[0])
+                    message = ' '.join(data_tokens)
+                    # gets username of current socket, and then sends message to target socket
+                    try:
+                        if (len(userRegistry) > 0):
+                            i = 0
+                            j = 0
+                            for users in userRegistry:
+                                if (userRegistry[i][0] == clientSocket):
+                                    userName = userRegistry[i][1][1]
+                                i += 1
+                            for users in userRegistry:
+                                if (userRegistry[j][1][1] == target):
+                                    serverMessageHandler(userRegistry[j][0], str(userName) + '(private): ' + str(message), 2)
+                                j += 1
+                    except Exception as e:
+                        print("Error: " + str(e))
+
                 # QUIT COMMAND
                 elif (data_tokens[0] == 'QUIT'):
                     clientSocket.send('QUIT'.encode())
                     clientSocket.close()
+                    removeUser(clientSocket)
                     return
                 
                 # Otherwise
