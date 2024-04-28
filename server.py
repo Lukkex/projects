@@ -126,22 +126,22 @@ def getUserTuple(clientSocket):
 '''
 
 # returns name of user (not functional, wont run first line when called)
-'''
 def getUsername(clientSocket):
-    print('wtf')
     try:
         if (len(userRegistry) > 0):
+            
+            regSockets, userTuples = zip(*userRegistry)
+            regAddresses, regUsernames = zip(*userTuples)
             i = 0
-            for users in userRegistry:
-                if (userRegistry[i][0] == clientSocket):
-                    return userRegistry[i][1][1]
+            for socket in regSockets:
+                if (socket == clientSocket):
+                    return regUsernames[i]
                 i += 1
 
     except Exception as e:
         print("Error: " + str(e))
     
     return None
-'''
 
 # Removes user from registry
 def removeUser(clientSocket):
@@ -173,6 +173,7 @@ def removeUser(clientSocket):
         print("Error: " + str(e))
     
 def handleClientConnection(clientSocket, clientAddress):
+    hasJoined = False
     while True:
         try:
             clientSocket.settimeout(300)
@@ -196,68 +197,97 @@ def handleClientConnection(clientSocket, clientAddress):
                             clientSocket.send('Successfully joined! Enjoy!'.encode())
                             print(str(data_tokens[1] + " joined!"))
                             serverMessageHandler(clientSocket, str(data_tokens[1]) + ' joined!', 0)
+                            hasJoined = True
                         else:
                             clientSocket.send('Too many users in registry, try again later!'.encode())
                         
                     else:
                         clientSocket.send('Invalid number of arguments for JOIN.\n\nTry: \'JOIN <username>\''.encode())
-                
+            
                 # LIST COMMAND
                 elif (data_tokens[0] == 'LIST'):
-                    if (checkIfMember(clientAddress)):
+                    if (hasJoined):
                         userList = str(regToString(userRegistry))
                         clientSocket.send(userList.encode())
-                        print('Sent list!')
+                        print('Sent list!')    
                     else:
-                        clientSocket.send('You\'re not registered yet!'.encode())
+                        clientSocket.send('You\'re not registered yet!'.encode()) 
                 
                 # BCST COMMAND
                 elif(data_tokens[0] == 'BCST'):
-                    # removes fluff at beginning of message
-                    data_tokens.remove(data_tokens[0])
-                    broadcastmsg = ' '.join(data_tokens)
-                    # gets username of current socket
-                    try:
-                        if (len(userRegistry) > 0):
-                            i = 0
-                            for users in userRegistry:
-                                if (userRegistry[i][0] == clientSocket):
-                                    userName = userRegistry[i][1][1]
-                                i += 1
-                    except Exception as e:
-                        print("Error: " + str(e))
+                    if (hasJoined):
+                        if (len(data_tokens) > 1):
+                            # removes fluff at beginning of message
+                            data_tokens.remove(data_tokens[0])
+                            broadcastmsg = ' '.join(data_tokens)
+                            # gets username of current socket
+                            try:
+                                if (len(userRegistry) > 0):
+                                    i = 0
+                                    for users in userRegistry:
+                                        if (userRegistry[i][0] == clientSocket):
+                                            userName = userRegistry[i][1][1]
+                                        i += 1
 
-                    clientSocket.send((str(userName) + ' is sending a broadcast\n').encode())
-                    serverMessageHandler(clientSocket, str(userName) + ': ' + str(broadcastmsg), 1)
+                                clientSocket.send((str(userName) + ' is sending a broadcast\n').encode())
+                                serverMessageHandler(clientSocket, str(userName) + ': ' + str(broadcastmsg), 1)
+                            except Exception as e:
+                                print("Error: " + str(e))
+                        else:
+                            clientSocket.send('Message cannot be empty!'.encode())
+                    else:
+                        clientSocket.send('You\'re not registered yet!'.encode())
                 
                 # MESG COMMAND
                 elif(data_tokens[0] == 'MESG'):
-                    # removes fluff at beginning of message while storing target
-                    target = data_tokens[1]
-                    data_tokens.remove(data_tokens[1])
-                    data_tokens.remove(data_tokens[0])
-                    message = ' '.join(data_tokens)
-                    # gets username of current socket, and then sends message to target socket
-                    try:
-                        if (len(userRegistry) > 0):
-                            i = 0
+                    if (hasJoined):
+                        if (len(data_tokens) <= 1):
+                            clientSocket.send('Invalid syntax.\n\nMESG <username> <message>'.encode())                       
+                        else:
+                            # removes fluff at beginning of message while storing target
+                            target = str(data_tokens[1])
+
+                            userExists = False
                             j = 0
                             for users in userRegistry:
-                                if (userRegistry[i][0] == clientSocket):
-                                    userName = userRegistry[i][1][1]
-                                i += 1
-                            for users in userRegistry:
                                 if (userRegistry[j][1][1] == target):
-                                    serverMessageHandler(userRegistry[j][0], str(userName) + '(private): ' + str(message), 2)
+                                    userExists = True
                                 j += 1
-                    except Exception as e:
-                        print("Error: " + str(e))
+
+                            if (userExists):
+                                data_tokens.remove(data_tokens[1])
+                                data_tokens.remove(data_tokens[0])
+                                message = ' '.join(data_tokens)
+                                # gets username of current socket, and then sends message to target socket
+                                try:
+                                    if (len(userRegistry) > 0):
+                                        i = 0
+                                        j = 0
+                                        for users in userRegistry:
+                                            if (userRegistry[i][0] == clientSocket):
+                                                userName = userRegistry[i][1][1]
+                                            i += 1
+                                        for users in userRegistry:
+                                            if (userRegistry[j][1][1] == target):
+                                                serverMessageHandler(userRegistry[j][0], str(userName) + '(private): ' + str(message), 2)
+                                            j += 1
+                                except Exception as e:
+                                    print("Error: " + str(e))
+                            else:
+                                clientSocket.send('User is not registered!'.encode())    
+                    else:
+                        clientSocket.send('You\'re not registered yet!'.encode()) 
 
                 # QUIT COMMAND
                 elif (data_tokens[0] == 'QUIT'):
+                    if (hasJoined):
+                        username = getUsername(clientSocket) 
+                        serverMessageHandler(clientSocket, username + ' left.', 0)
+                        serverMessageHandler(clientSocket, username + ' is quitting the chat server.', 2)
+                        print(username + ' has left the server.')
+                        removeUser(clientSocket)
                     clientSocket.send('QUIT'.encode())
                     clientSocket.close()
-                    removeUser(clientSocket)
                     return
                 
                 # Otherwise
