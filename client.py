@@ -30,17 +30,18 @@ import threading
 message = ''
 
 def listenForServer(clientSocket):
-    while True:
+    keepListening = True
+    while keepListening:
         try:
             serverMessage = clientSocket.recv(1024).decode('utf-8')
             if (serverMessage is not None):
                 print(f'\b\b{serverMessage}', end='\n> ')
                 if (serverMessage == 'Connection timed out, please rejoin. \n(You took too long to send another message!)'):
-                    print('\n\n\nEnter any key to quit the program.')
-                    break
+                    print('\n\nEnter any key to quit the program.')
+                    keepListening = False
             if (serverMessage == 'QUIT'):
-                print('\n\n\nEnter any key to quit the program.')
-                break
+                print('\n\nEnter any key to quit the program.')
+                keepListening = False
 
         except Exception as e:
             pass
@@ -54,7 +55,7 @@ def listenForServer(clientSocket):
 
 # If the number of arguments are not 3, terminate the process
 if (len(sys.argv) != 3):
-    print('Invalid number of arguments.')
+    print('Invalid number of arguments. Correct usage: python client.py <server> <port>')
     quit()
 
 # Takes in the server name and port and creates the client socket
@@ -64,9 +65,9 @@ clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.settimeout(5)
 try:
     clientSocket.connect((serverName, serverPort))
-    print("Connection established! \n\nEnter JOIN <username> to join the chatroom.\n\n")
+    print("Connection established! \n\nEnter JOIN <username> to join the chatroom.\n")
 except Exception as e:
-    print(f"Could not establish a connection with the host.\n\nError: {e}")
+    print(f"Could not establish a connection with the host. Error: {e}")
     quit()
 
 t = threading.Thread(target=listenForServer, args=(clientSocket,))

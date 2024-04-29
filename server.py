@@ -47,10 +47,16 @@ def setRegistry(newReg):
 # Will return false if member cannot join (list is full)
 def join(clientSocket, clientAddress, username):
     try:
-        if (len(userRegistry) <= 10):
+        if (len(userRegistry) < 10):
+            i = 0
+            # Checks if username is already in use
+            for users in userRegistry:
+                if (userRegistry[i][1][1] == username):
+                    return 1
+                i += 1
             userRegistry.append((clientSocket, (clientAddress, username)))
-            return True
-        return False
+            return 2
+        return 0
     except Exception as e:
         print("Error: " + str(e))
 
@@ -190,28 +196,39 @@ def handleClientConnection(clientSocket, clientAddress):
                     if (len(data_tokens) == 2):
                         # Makes sure client isn't already a member
                         if (checkIfMember(clientAddress)):
-                            clientSocket.send('You\'re already a member!'.encode())
+                            clientSocket.send('You\'re already a member!\n'.encode())
                         # Assumes username is alphanumeric
                         # Checks if there is room for user to join
-                        elif (join(clientSocket, clientAddress, data_tokens[1])):
-                            clientSocket.send('Successfully joined! Enjoy!'.encode())
-                            print(str(data_tokens[1] + " joined!"))
-                            serverMessageHandler(clientSocket, str(data_tokens[1]) + ' joined!', 0)
-                            hasJoined = True
                         else:
-                            clientSocket.send('Too many users in registry, try again later!'.encode())
+                            joinResult = join(clientSocket, clientAddress, data_tokens[1])
+                            if (joinResult == 2):
+                                clientSocket.send('Successfully joined! Enjoy!\n'.encode())
+                                print(str(data_tokens[1] + " joined!"))
+                                serverMessageHandler(clientSocket, str(data_tokens[1]) + ' joined!', 0)
+                                hasJoined = True
+                            elif (joinResult == 1):
+                                clientSocket.send('That username is already in use!\n'.encode())
+                            else:
+                                clientSocket.send('Too many users in registry, try again later!\n'.encode())
                         
                     else:
-                        clientSocket.send('Invalid number of arguments for JOIN.\n\nTry: \'JOIN <username>\''.encode())
+                        clientSocket.send('Invalid number of arguments for JOIN. Try: \'JOIN <username>\'\n'.encode())
             
                 # LIST COMMAND
                 elif (data_tokens[0] == 'LIST'):
                     if (hasJoined):
-                        userList = str(regToString(userRegistry))
-                        clientSocket.send(userList.encode())
-                        print('Sent list!')    
+                        #userList = str(regToString(userRegistry))
+                        listStr = 'Connected users: '
+                        i = 0
+                        for users in userRegistry:
+                            listStr = listStr + str(userRegistry[i][1][1]) + ', '
+                            i += 1
+                        listStr = listStr[:-2] + "\n"
+                    
+                        clientSocket.send(listStr.encode())
+                        #print('Sent list!')    
                     else:
-                        clientSocket.send('You\'re not registered yet!'.encode()) 
+                        clientSocket.send('You\'re not registered yet!\n'.encode()) 
                 
                 # BCST COMMAND
                 elif(data_tokens[0] == 'BCST'):
@@ -229,20 +246,20 @@ def handleClientConnection(clientSocket, clientAddress):
                                             userName = userRegistry[i][1][1]
                                         i += 1
 
-                                clientSocket.send((str(userName) + ' is sending a broadcast\n').encode())
+                                clientSocket.send((str(userName) + ' is sending a broadcast!\n').encode())
                                 serverMessageHandler(clientSocket, str(userName) + ': ' + str(broadcastmsg), 1)
                             except Exception as e:
                                 print("Error: " + str(e))
                         else:
-                            clientSocket.send('Message cannot be empty!'.encode())
+                            clientSocket.send('Message cannot be empty!\n'.encode())
                     else:
-                        clientSocket.send('You\'re not registered yet!'.encode())
+                        clientSocket.send('You\'re not registered yet!\n'.encode())
                 
                 # MESG COMMAND
                 elif(data_tokens[0] == 'MESG'):
                     if (hasJoined):
                         if (len(data_tokens) <= 1):
-                            clientSocket.send('Invalid syntax.\n\nMESG <username> <message>'.encode())                       
+                            clientSocket.send('Invalid syntax.\n\nMESG <username> <message>\n'.encode())                       
                         else:
                             # removes fluff at beginning of message while storing target
                             target = str(data_tokens[1])
@@ -269,14 +286,18 @@ def handleClientConnection(clientSocket, clientAddress):
                                             i += 1
                                         for users in userRegistry:
                                             if (userRegistry[j][1][1] == target):
-                                                serverMessageHandler(userRegistry[j][0], str(userName) + '(private): ' + str(message), 2)
+                                                targetSocket = userRegistry[j][0]
+                                                if(targetSocket == clientSocket):
+                                                    clientSocket.send('You cannot send a message to yourself!\n'.encode())
+                                                else:
+                                                    serverMessageHandler(targetSocket, str(userName) + ' (private): ' + str(message), 2)
                                             j += 1
                                 except Exception as e:
                                     print("Error: " + str(e))
                             else:
-                                clientSocket.send('User is not registered!'.encode())    
+                                clientSocket.send('Unknown user!\n'.encode())    
                     else:
-                        clientSocket.send('You\'re not registered yet!'.encode()) 
+                        clientSocket.send('You\'re not registered yet!\n'.encode()) 
 
                 # QUIT COMMAND
                 elif (data_tokens[0] == 'QUIT'):
@@ -289,10 +310,17 @@ def handleClientConnection(clientSocket, clientAddress):
                     clientSocket.send('QUIT'.encode())
                     clientSocket.close()
                     return
+
+                # HELP COMMAND
+                elif (data_tokens[0] == 'HELP'):
+                    if (hasJoined):
+                        clientSocket.send('Please use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nHELP\nQUIT\n'.encode())
+                    else:
+                        clientSocket.send('Please use one of the following:\nJOIN <username>\nHELP\nQUIT\n'.encode())
                 
                 # Otherwise
                 else:
-                    clientSocket.send('\nInvalid command.\n\nPlease use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nQUIT\n\n'.encode())
+                    clientSocket.send('Invalid command. Please use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nHELP\nQUIT\n'.encode())
                 #clientSocket.send('PONG!'.encode())
         
         except timeout:
@@ -318,7 +346,7 @@ def handleClientConnection(clientSocket, clientAddress):
 # If the amount of arguments is anything other than 2, 
 # it will say in the console an invalid number of args and  kill the process.
 if (len(sys.argv) != 2):
-    print('Invalid number of arguments.')
+    print('Invalid number of arguments. Correct usage: python server.py <port>')
     quit()
 
 # Takes in the server port and creates a TCP socket on the server end
