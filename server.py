@@ -78,10 +78,6 @@ def checkIfMember(clientAddress):
     except Exception as e:
         print("Error: " + str(e)) 
 
-def regToString(list):
-    regSockets, userTuples = zip(*list)
-    return ',\n'.join(map(str, userTuples))
-
 # Handles how to dispatch types of messages
 def serverMessageHandler(targSocket, message, type):
     try:
@@ -109,27 +105,6 @@ def serverMessageHandler(targSocket, message, type):
 
     except Exception as e:
         print("Error: " + str(e))
-
-# returns tuple of user (not functional, wont run first line when called)
-'''
-def getUserTuple(clientSocket):
-    try:
-        if (len(userRegistry) > 0):
-            print('tuple 0')
-            # Separates tuple into list of all addresses and usernames
-            regSockets, userTuples = zip(*userRegistry)
-            i = 0
-            print('tuple 1')
-            for socket in regSockets:
-                if (socket == clientSocket):
-                    return userRegistry[i]
-                i += 1
-
-    except Exception as e:
-        print("Error: " + str(e))
-    
-    return None
-'''
 
 # returns name of user (not functional, wont run first line when called)
 def getUsername(clientSocket):
