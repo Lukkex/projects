@@ -34,14 +34,14 @@ def listenForServer(clientSocket):
     while keepListening:
         try:
             serverMessage = clientSocket.recv(1024).decode('utf-8')
-            if (serverMessage is not None):
+            if (serverMessage == 'QUIT'):
+                print('\n\nEnter any key to quit the program.')
+                keepListening = False
+            elif (serverMessage is not None and serverMessage != ""):
                 print(f'\b\b{serverMessage}', end='\n> ')
                 if (serverMessage == 'Connection timed out, please rejoin. \n(You took too long to send another message!)'):
                     print('\n\nEnter any key to quit the program.')
                     keepListening = False
-            if (serverMessage == 'QUIT'):
-                print('\n\nEnter any key to quit the program.')
-                keepListening = False
 
         except Exception as e:
             pass

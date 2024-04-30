@@ -320,7 +320,10 @@ def handleClientConnection(clientSocket, clientAddress):
                 
                 # Otherwise
                 else:
-                    clientSocket.send('Invalid command. Please use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nHELP\nQUIT\n'.encode())
+                    if (hasJoined):
+                        clientSocket.send('Invalid command. Please use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nHELP\nQUIT\n'.encode())
+                    else:
+                        clientSocket.send('Invalid command. Please use one of the following:\nJOIN <username>\nHELP\nQUIT\n'.encode())
                 #clientSocket.send('PONG!'.encode())
         
         except timeout:
