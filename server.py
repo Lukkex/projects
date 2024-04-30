@@ -43,8 +43,9 @@ userRegistry = []
 def setRegistry(newReg):
     userRegistry = newReg
 
-# Will return true if member successfully added to registry
-# Will return false if member cannot join (list is full)
+# Returns 1 if username in use
+# returns 2 if username is available
+# returns 0 if registry full
 def join(clientSocket, clientAddress, username):
     try:
         if (len(userRegistry) < 10):
@@ -79,6 +80,9 @@ def checkIfMember(clientAddress):
         print("Error: " + str(e)) 
 
 # Handles how to dispatch types of messages
+# returns 0 if broadcasting to everyone except sender
+# returns 1 if broadcasting to everyone including sender
+# returns 2 if broadcasting to a single member
 def serverMessageHandler(targSocket, message, type):
     try:
         if (len(userRegistry) > 0):
@@ -106,7 +110,7 @@ def serverMessageHandler(targSocket, message, type):
     except Exception as e:
         print("Error: " + str(e))
 
-# returns name of user (not functional, wont run first line when called)
+# returns name of user in (clientSocket)
 def getUsername(clientSocket):
     try:
         if (len(userRegistry) > 0):
@@ -124,35 +128,28 @@ def getUsername(clientSocket):
     
     return None
 
-# Removes user from registry
+# Removes user assiciated with (clientSocket) from registry
 def removeUser(clientSocket):
     try:
         if (len(userRegistry) > 0):
             # Separates tuple into list of all addresses and usernames
-            
-            try:
-                if (len(userRegistry) > 0):
-                    # Separates tuple into list of all addresses and usernames
-                    regSockets, userTuples = zip(*userRegistry)
-                    i = 0
-                    for socket in regSockets:
-                        if (socket == clientSocket):
-                            clientTuple = userRegistry[i]
-                        i += 1
-
-            except Exception as e:
-                print("Error: " + str(e))
-            
-            userRegistry.remove(clientTuple)
-            # setRegistry(newReg)
-            print('Removed user from list!')
-            return True
-        else:
-            return False
+            regSockets, userTuples = zip(*userRegistry)
+            i = 0
+            for socket in regSockets:
+                if (socket == clientSocket):
+                    clientTuple = userRegistry[i]
+                i += 1
 
     except Exception as e:
         print("Error: " + str(e))
     
+    userRegistry.remove(clientTuple)
+    # setRegistry(newReg)
+    print('Removed user from list!')
+    return True
+
+# Bulk handling of client interaction
+# contains implementation of client commands, timeout due to disconnect, and data management
 def handleClientConnection(clientSocket, clientAddress):
     hasJoined = False
     while True:
@@ -207,20 +204,15 @@ def handleClientConnection(clientSocket, clientAddress):
                 
                 # BCST COMMAND
                 elif(data_tokens[0] == 'BCST'):
+                    # checks if user is joined and if their usage is correct with error checking
                     if (hasJoined):
                         if (len(data_tokens) > 1):
                             # removes fluff at beginning of message
                             data_tokens.remove(data_tokens[0])
                             broadcastmsg = ' '.join(data_tokens)
-                            # gets username of current socket
+                            # Noitifies user they are sending a broadcast and calls serverMessageHandler to broadcast
                             try:
-                                if (len(userRegistry) > 0):
-                                    i = 0
-                                    for users in userRegistry:
-                                        if (userRegistry[i][0] == clientSocket):
-                                            userName = userRegistry[i][1][1]
-                                        i += 1
-
+                                userName = getUsername(clientSocket)
                                 clientSocket.send((str(userName) + ' is sending a broadcast!\n').encode())
                                 serverMessageHandler(clientSocket, str(userName) + ': ' + str(broadcastmsg), 1)
                             except Exception as e:
@@ -231,6 +223,7 @@ def handleClientConnection(clientSocket, clientAddress):
                         clientSocket.send('You\'re not registered yet!\n'.encode())
                 
                 # MESG COMMAND
+                # checks if user is joined and if their usage is correct with error checking
                 elif(data_tokens[0] == 'MESG'):
                     if (hasJoined):
                         if (len(data_tokens) <= 1):
@@ -275,6 +268,8 @@ def handleClientConnection(clientSocket, clientAddress):
                         clientSocket.send('You\'re not registered yet!\n'.encode()) 
 
                 # QUIT COMMAND
+                # checks if user is joined and if their usage is correct with error checking
+                # calls removeUser to remove user from the userRegistry, and gracefully closes socket connection
                 elif (data_tokens[0] == 'QUIT'):
                     if (hasJoined):
                         username = getUsername(clientSocket) 
@@ -287,6 +282,7 @@ def handleClientConnection(clientSocket, clientAddress):
                     return
 
                 # HELP COMMAND
+                # Prints usage
                 elif (data_tokens[0] == 'HELP'):
                     if (hasJoined):
                         clientSocket.send('Please use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nHELP\nQUIT\n'.encode())
@@ -294,6 +290,7 @@ def handleClientConnection(clientSocket, clientAddress):
                         clientSocket.send('Please use one of the following:\nJOIN <username>\nHELP\nQUIT\n'.encode())
                 
                 # Otherwise
+                # Prints usage in case of incorrect usage
                 else:
                     if (hasJoined):
                         clientSocket.send('Invalid command. Please use one of the following:\nJOIN <username>\nLIST\nMESG <recipient> <message>\nBCST <message>\nHELP\nQUIT\n'.encode())
